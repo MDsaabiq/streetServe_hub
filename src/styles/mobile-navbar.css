@@ -1,0 +1,190 @@
+/* Mobile Navbar Enhancements */
+
+/* Ensure proper touch targets on all mobile devices */
+@media (max-width: 1023px) {
+  /* Minimum touch target size for accessibility */
+  .navbar-mobile-touch {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Smooth scrolling for mobile menu */
+  .navbar-mobile-menu {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Prevent zoom on input focus (if any inputs are added later) */
+  input, select, textarea {
+    font-size: 16px;
+  }
+
+  /* Ensure proper spacing on very small screens */
+  @media (max-width: 375px) {
+    .navbar-logo {
+      font-size: 1.25rem; /* Smaller logo on very small screens */
+    }
+    
+    .navbar-mobile-menu-item {
+      padding: 12px 16px;
+      font-size: 15px;
+    }
+  }
+
+  /* Optimize for larger mobile screens */
+  @media (min-width: 640px) and (max-width: 1023px) {
+    .navbar-mobile-menu {
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  }
+}
+
+/* Tablet specific optimizations */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .navbar-tablet-layout {
+    padding: 0 2rem;
+  }
+  
+  .navbar-mobile-menu {
+    padding: 2rem;
+  }
+  
+  .navbar-mobile-menu-item {
+    padding: 16px 20px;
+    font-size: 16px;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .navbar-icons {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Dark mode optimizations for mobile */
+@media (prefers-color-scheme: dark) {
+  .navbar-mobile-backdrop {
+    background-color: rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .navbar-mobile-menu,
+  .navbar-mobile-backdrop {
+    transition: none;
+  }
+}
+
+/* Landscape orientation on mobile */
+@media (max-width: 1023px) and (orientation: landscape) {
+  .navbar-mobile-menu {
+    max-height: calc(100vh - 4rem);
+    padding: 1rem;
+  }
+  
+  .navbar-mobile-menu-item {
+    padding: 8px 16px;
+  }
+  
+  .navbar-user-section {
+    padding-top: 1rem;
+    margin-top: 1rem;
+  }
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .navbar-mobile-menu {
+    /* Fix for iOS Safari viewport height issues */
+    max-height: calc(100vh - 4rem - env(safe-area-inset-bottom));
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+  
+  /* Prevent rubber band scrolling */
+  .navbar-mobile-backdrop {
+    position: fixed;
+    overflow: hidden;
+  }
+}
+
+/* Android Chrome specific optimizations */
+@media screen and (max-width: 1023px) {
+  .navbar-mobile-menu {
+    /* Optimize for Android's address bar behavior */
+    max-height: calc(100vh - 4rem);
+    max-height: calc(100dvh - 4rem); /* Use dynamic viewport height if supported */
+  }
+}
+
+/* Focus styles for keyboard navigation */
+.navbar-mobile-menu-item:focus-visible,
+.navbar-hamburger:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Hover states only for devices that support hover */
+@media (hover: hover) and (pointer: fine) {
+  .navbar-desktop-link:hover {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+  }
+}
+
+/* Active states for touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .navbar-mobile-menu-item:active {
+    background-color: hsl(var(--muted) / 0.8);
+    transform: scale(0.98);
+  }
+  
+  .navbar-hamburger:active {
+    transform: scale(0.95);
+  }
+}
+
+/* Ensure proper z-index stacking */
+.navbar-container {
+  position: relative;
+  z-index: 50;
+}
+
+.navbar-mobile-backdrop {
+  z-index: 40;
+}
+
+.navbar-mobile-menu {
+  z-index: 50;
+}
+
+/* Smooth transitions for better UX */
+.navbar-mobile-menu {
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+
+.navbar-mobile-backdrop {
+  transition: opacity 0.2s ease-out;
+}
+
+/* Loading state optimizations */
+.navbar-loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Print styles */
+@media print {
+  .navbar-mobile-menu,
+  .navbar-mobile-backdrop,
+  .navbar-hamburger {
+    display: none !important;
+  }
+}

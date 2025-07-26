@@ -103,68 +103,90 @@ export const Checkout = () => {
     setLoading(true);
     try {
       // Use transaction to ensure inventory is updated atomically
-      const orderData = await runTransaction(db, async (transaction) => {
+      const orderIds = await runTransaction(db, async (transaction) => {
         // Check inventory and update quantities
         for (const item of cartItems) {
           const productRef = doc(db, 'products', item.id);
           const productDoc = await transaction.get(productRef);
-          
+
           if (!productDoc.exists()) {
             throw new Error(`Product ${item.title} no longer exists`);
           }
-          
+
           const productData = productDoc.data();
           const currentQuantity = parseInt(productData.quantity) || 0;
-          
+
           if (currentQuantity < item.quantity) {
             throw new Error(`Insufficient stock for ${item.title}. Available: ${currentQuantity}`);
           }
-          
+
           // Update product quantity
           transaction.update(productRef, {
             quantity: (currentQuantity - item.quantity).toString(),
             updatedAt: new Date()
           });
         }
-        
-        // Create order
-        const orderData = {
-          buyerId: userProfile.uid,
-          buyerName: userProfile.displayName || 'Unknown',
-          buyerEmail: userProfile.email,
-          items: cartItems.map(item => ({
-            productId: item.id,
-            title: item.title,
-            price: item.price,
-            quantity: item.quantity,
-            vendorId: item.vendorId,
-            vendorName: item.vendorName,
-            image: item.image
-          })),
-          shippingInfo,
-          paymentInfo: {
-            method: paymentInfo.method,
-            status: paymentInfo.method === 'cod' ? 'pending' : 'paid'
-          },
-          totalAmount: getTotalPrice(),
-          status: 'pending',
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-        
-        return orderData;
+
+        // Group items by vendor
+        const vendorGroups = cartItems.reduce((groups, item) => {
+          if (!groups[item.vendorId]) {
+            groups[item.vendorId] = [];
+          }
+          groups[item.vendorId].push(item);
+          return groups;
+        }, {} as Record<string, typeof cartItems>);
+
+        console.log('Creating orders for vendor groups:', vendorGroups);
+
+        // Create separate orders for each vendor
+        const createdOrderIds: string[] = [];
+
+        for (const [vendorId, vendorItems] of Object.entries(vendorGroups)) {
+          const vendorTotal = vendorItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+          // For each item, create a separate order (to match VendorOrders expectation)
+          for (const item of vendorItems) {
+            const orderRef = doc(collection(db, 'orders'));
+            const orderData = {
+              buyerId: userProfile.uid,
+              buyerName: userProfile.displayName || 'Unknown',
+              buyerEmail: userProfile.email,
+              buyerPhone: shippingInfo.phone,
+              buyerAddress: `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.state} - ${shippingInfo.pincode}`,
+              productId: item.id,
+              productTitle: item.title,
+              quantity: item.quantity,
+              price: item.price,
+              totalAmount: item.price * item.quantity,
+              vendorId: item.vendorId,
+              vendorName: item.vendorName,
+              shippingInfo,
+              paymentInfo: {
+                method: paymentInfo.method,
+                status: paymentInfo.method === 'cod' ? 'pending' : 'paid'
+              },
+              status: 'pending',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+
+            console.log('Creating order for vendor:', vendorId, orderData);
+            transaction.set(orderRef, orderData);
+            createdOrderIds.push(orderRef.id);
+          }
+        }
+
+        return createdOrderIds;
       });
-      
-      // Add order to collection
-      const orderRef = await addDoc(collection(db, 'orders'), orderData);
-      setOrderId(orderRef.id);
+
+      setOrderId(orderIds[0]); // Set the first order ID for display
       
       // Clear cart
       clearCart();
       
       toast({
-        title: "Order Placed Successfully!",
-        description: `Your order #${orderRef.id.slice(-8)} has been placed.`,
+        title: "Orders Placed Successfully!",
+        description: `${orderIds.length} order(s) have been placed and sent to vendors for confirmation.`,
       });
       
       setCurrentStep(4);
