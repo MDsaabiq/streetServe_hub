@@ -1,86 +1,85 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Search, ShoppingCart, Star, Filter } from 'lucide-react';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock data for demonstration
-const mockProducts = [
-  {
-    id: '1',
-    title: 'Fresh Vegetables Bundle',
-    price: 299,
-    image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400',
-    vendor: 'Green Valley Farms',
-    rating: 4.8,
-    quantity: '5kg Mixed',
-    category: 'Vegetables'
-  },
-  {
-    id: '2',
-    title: 'Premium Spices Set',
-    price: 899,
-    image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400',
-    vendor: 'Spice Paradise',
-    rating: 4.9,
-    quantity: '500g Each',
-    category: 'Spices'
-  },
-  {
-    id: '3',
-    title: 'Street Food Equipment Kit',
-    price: 15999,
-    image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400',
-    vendor: 'Kitchen Pro',
-    rating: 4.6,
-    quantity: 'Complete Set',
-    category: 'Equipment'
-  },
-  {
-    id: '4',
-    title: 'Organic Rice (Premium)',
-    price: 450,
-    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400',
-    vendor: 'Organic Valley',
-    rating: 4.7,
-    quantity: '10kg',
-    category: 'Grains'
-  },
-  {
-    id: '5',
-    title: 'Fresh Meat Selection',
-    price: 799,
-    image: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400',
-    vendor: 'Fresh Meat Co.',
-    rating: 4.5,
-    quantity: '2kg Mixed',
-    category: 'Meat'
-  },
-  {
-    id: '6',
-    title: 'Cooking Oil Bundle',
-    price: 650,
-    image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400',
-    vendor: 'Pure Oil Industries',
-    rating: 4.4,
-    quantity: '5L Total',
-    category: 'Oil'
-  }
-];
+interface Product {
+  id: string;
+  title: string;
+  price: number;
+  image: string;
+  quantity: string;
+  category: string;
+  description: string;
+  vendorId: string;
+  vendorName: string;
+  createdAt: Date;
+}
 
 export const Marketplace = () => {
+  const { toast } = useToast();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  const categories = ['All', 'Vegetables', 'Spices', 'Equipment', 'Grains', 'Meat', 'Oil'];
+  const categories = ['All', 'Vegetables', 'Fruits', 'Spices', 'Grains', 'Meat', 'Dairy', 'Oil', 'Equipment', 'Packaging', 'Other'];
 
-  const filteredProducts = mockProducts.filter(product => {
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
+        const querySnapshot = await getDocs(q);
+        const fetchedProducts: Product[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          fetchedProducts.push({
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate() || new Date(),
+          } as Product);
+        });
+
+        setProducts(fetchedProducts);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch products.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [toast]);
+
+  const filteredProducts = products.filter(product => {
     const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.vendor.toLowerCase().includes(searchTerm.toLowerCase());
+                         product.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-96">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -144,13 +143,13 @@ export const Marketplace = () => {
                 </Badge>
                 <div className="flex items-center text-sm text-muted-foreground">
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
-                  {product.rating}
+                  4.5
                 </div>
               </div>
               <CardTitle className="text-lg group-hover:text-primary transition-colors">
                 {product.title}
               </CardTitle>
-              <p className="text-sm text-muted-foreground">{product.vendor}</p>
+              <p className="text-sm text-muted-foreground">by {product.vendorName}</p>
             </CardHeader>
 
             <CardContent className="pt-0">
@@ -175,10 +174,13 @@ export const Marketplace = () => {
         ))}
       </div>
 
-      {filteredProducts.length === 0 && (
+      {filteredProducts.length === 0 && !loading && (
         <div className="text-center py-12">
           <p className="text-muted-foreground text-lg">
-            No products found. Try adjusting your search or filters.
+            {products.length === 0 
+              ? "No products available yet. Vendors can start listing their products!" 
+              : "No products found. Try adjusting your search or filters."
+            }
           </p>
         </div>
       )}
