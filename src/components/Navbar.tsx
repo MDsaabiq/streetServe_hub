@@ -1,133 +1,92 @@
-
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Store, Package, Building, ShoppingCart, BarChart3, FileText, LogOut } from 'lucide-react';
 import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-} from '@/components/ui/navigation-menu';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useToast } from '@/hooks/use-toast';
+import { Cart } from '@/components/Cart';
 
-export const Navbar = () => {
-  const { currentUser, userProfile, logout } = useAuth();
-  const location = useLocation();
+const Navbar = () => {
+  const { currentUser, logout, userProfile } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const handleLogout = async () => {
     try {
       await logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  const getBuyerMenuItems = () => [
-    { label: 'Marketplace', href: '/marketplace', icon: ShoppingCart },
-    { label: 'Properties', href: '/properties', icon: Building },
-    { label: 'Dashboard', href: '/dashboard', icon: BarChart3 }
-  ];
-
-  const getVendorMenuItems = () => [
-    { label: 'My Products', href: '/vendor/products', icon: Package },
-    { label: 'Orders', href: '/vendor/orders', icon: FileText },
-    { label: 'Analytics', href: '/vendor/analytics', icon: BarChart3 },
-    { label: 'Dashboard', href: '/dashboard', icon: Store }
-  ];
-
-  const getLandownerMenuItems = () => [
-    { label: 'My Properties', href: '/landowner/properties', icon: Building },
-    { label: 'Analytics', href: '/landowner/analytics', icon: BarChart3 },
-    { label: 'Dashboard', href: '/dashboard', icon: Store }
-  ];
-
-  const getMenuItems = () => {
-    switch (userProfile?.role) {
-      case 'buyer':
-        return getBuyerMenuItems();
-      case 'vendor':
-        return getVendorMenuItems();
-      case 'landowner':
-        return getLandownerMenuItems();
-      default:
-        return [];
+      navigate('/login');
+    } catch (error: any) {
+      toast({
+        title: "Logout Failed",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
-              <Store className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              StreetServe
-            </span>
+    <nav className="bg-background border-b">
+      <div className="flex h-16 items-center px-4">
+        <Link to="/" className="font-bold text-2xl mr-6">
+          StreetServe
+        </Link>
+        <div className="flex items-center space-x-4 ml-auto">
+          <Link to="/marketplace" className="text-sm font-medium hover:underline">
+            Marketplace
           </Link>
-
-          {/* Navigation Menu */}
-          <div className="flex items-center space-x-6">
-            {currentUser && userProfile ? (
-              <>
-                <NavigationMenu>
-                  <NavigationMenuList>
-                    <NavigationMenuItem>
-                      <NavigationMenuTrigger className="bg-transparent">
-                        Menu
-                      </NavigationMenuTrigger>
-                      <NavigationMenuContent>
-                        <div className="grid w-64 gap-3 p-4">
-                          {getMenuItems().map((item) => {
-                            const Icon = item.icon;
-                            return (
-                              <NavigationMenuLink key={item.href} asChild>
-                                <Link
-                                  to={item.href}
-                                  className={`flex items-center space-x-3 rounded-md p-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
-                                    location.pathname === item.href ? 'bg-accent text-accent-foreground' : ''
-                                  }`}
-                                >
-                                  <Icon className="h-4 w-4" />
-                                  <span>{item.label}</span>
-                                </Link>
-                              </NavigationMenuLink>
-                            );
-                          })}
-                        </div>
-                      </NavigationMenuContent>
-                    </NavigationMenuItem>
-                  </NavigationMenuList>
-                </NavigationMenu>
-
-                <div className="flex items-center space-x-4">
-                  <span className="text-sm text-muted-foreground">
-                    {userProfile.displayName || userProfile.email} ({userProfile.role})
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Logout
+          <Link to="/properties" className="text-sm font-medium hover:underline">
+            Properties
+          </Link>
+          
+          {currentUser && (
+            <>
+              <Cart />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={userProfile?.image} alt={userProfile?.displayName} />
+                      <AvatarFallback>{userProfile?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
                   </Button>
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center space-x-4">
-                <Button variant="ghost" asChild>
-                  <Link to="/login">Login</Link>
-                </Button>
-                <Button variant="marketplace" asChild>
-                  <Link to="/signup">Sign Up</Link>
-                </Button>
-              </div>
-            )}
-          </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard">Dashboard</Link>
+                  </DropdownMenuItem>
+                  {currentUser.role === 'vendor' && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/vendor/add-product">Add Product</Link>
+                    </DropdownMenuItem>
+                  )}
+                  {currentUser.role === 'landowner' && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/landowner/add-property">Add Property</Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile">Profile</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
         </div>
       </div>
     </nav>
   );
 };
+
+export default Navbar;

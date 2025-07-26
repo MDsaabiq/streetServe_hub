@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { Search, ShoppingCart, Filter, Star, Plus, Minus } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { useCart } from '@/contexts/CartContext';
 
 interface Product {
   id: string;
@@ -24,6 +24,7 @@ interface Product {
 
 export const Marketplace = () => {
   const { toast } = useToast();
+  const { addToCart } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -72,6 +73,10 @@ export const Marketplace = () => {
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const handleAddToCart = (product: Product) => {
+    addToCart(product);
+  };
 
   const addToCart = (productId: string) => {
     setCart(prev => ({
@@ -189,27 +194,15 @@ export const Marketplace = () => {
               </div>
 
               <div className="flex gap-2 items-center">
-                {getCartQuantity(product.id) > 0 ? (
-                  <div className="flex items-center gap-2 flex-1">
-                    <Button variant="outline" size="sm" onClick={() => removeFromCart(product.id)}>
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <span className="text-lg font-semibold">{getCartQuantity(product.id)}</span>
-                    <Button variant="outline" size="sm" onClick={() => addToCart(product.id)}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
                   <Button 
                     variant="marketplace" 
                     className="flex-1"
-                    onClick={() => addToCart(product.id)}
+                    onClick={() => handleAddToCart(product)}
                   >
                     <ShoppingCart className="mr-2 h-4 w-4" />
                     Add to Cart
                   </Button>
-                )}
-              </div>
+                </div>
             </CardContent>
           </Card>
         ))}

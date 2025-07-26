@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { Search, MapPin, Calendar, Star, Filter } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { LeaseRequestModal } from '@/pages/LeaseRequests';
 
 interface Property {
   id: string;
@@ -179,9 +179,14 @@ export const Properties = () => {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="accent" className="flex-1">
-                  Request Lease
-                </Button>
+                <LeaseRequestModal
+                  propertyId={property.id}
+                  propertyTitle={property.title}
+                  ownerId={property.ownerId}
+                  ownerName={property.ownerName}
+                  propertyLocation={property.location}
+                  propertyPrice={property.price}
+                />
                 <Button variant="outline" size="icon">
                   <Calendar className="h-4 w-4" />
                 </Button>
