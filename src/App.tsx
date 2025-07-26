@@ -15,8 +15,13 @@ import Marketplace from "./pages/Marketplace";
 import Properties from "./pages/Properties";
 import VendorProducts from "./pages/VendorProducts";
 import VendorAddProduct from "./pages/VendorAddProduct";
+import VendorEditProduct from "./pages/VendorEditProduct";
+import VendorOrders from "./pages/VendorOrders";
+import VendorAnalytics from "./pages/VendorAnalytics";
 import LandownerProperties from "./pages/LandownerProperties";
 import LandownerAddProperty from "./pages/LandownerAddProperty";
+import LandownerEditProperty from "./pages/LandownerEditProperty";
+import LandownerAnalytics from "./pages/LandownerAnalytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -62,6 +67,30 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
+              <Route 
+                path="/vendor/edit-product/:id" 
+                element={
+                  <ProtectedRoute requiredRole="vendor">
+                    <VendorEditProduct />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/vendor/orders" 
+                element={
+                  <ProtectedRoute requiredRole="vendor">
+                    <VendorOrders />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/vendor/analytics" 
+                element={
+                  <ProtectedRoute requiredRole="vendor">
+                    <VendorAnalytics />
+                  </ProtectedRoute>
+                } 
+              />
               
               {/* Landowner Routes */}
               <Route 
@@ -77,6 +106,22 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRole="landowner">
                     <LandownerAddProperty />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/landowner/edit-property/:id" 
+                element={
+                  <ProtectedRoute requiredRole="landowner">
+                    <LandownerEditProperty />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/landowner/analytics" 
+                element={
+                  <ProtectedRoute requiredRole="landowner">
+                    <LandownerAnalytics />
                   </ProtectedRoute>
                 } 
               />

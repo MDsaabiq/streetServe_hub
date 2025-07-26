@@ -66,10 +66,10 @@ export const Properties = () => {
   }, [toast]);
 
   const filteredProperties = properties.filter(property => {
-    const matchesSearch = property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         property.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         property.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         property.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (property.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (property.location || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (property.ownerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (property.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = selectedType === 'All' || property.type === selectedType;
     return matchesSearch && matchesType;
   });
@@ -86,7 +86,6 @@ export const Properties = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Properties for Lease</h1>
         <p className="text-muted-foreground">
@@ -94,7 +93,6 @@ export const Properties = () => {
         </p>
       </div>
 
-      {/* Search and Filters */}
       <div className="mb-8 space-y-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
@@ -112,7 +110,6 @@ export const Properties = () => {
           </Button>
         </div>
 
-        {/* Property Type Filter */}
         <div className="flex flex-wrap gap-2">
           {propertyTypes.map((type) => (
             <Button
@@ -127,13 +124,12 @@ export const Properties = () => {
         </div>
       </div>
 
-      {/* Properties Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProperties.map((property) => (
           <Card key={property.id} className="group hover:shadow-card transition-all duration-300 border-0 bg-gradient-card overflow-hidden">
             <div className="aspect-video overflow-hidden relative">
               <img
-                src={property.image}
+                src={property.image || '/placeholder.svg'}
                 alt={property.title}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
