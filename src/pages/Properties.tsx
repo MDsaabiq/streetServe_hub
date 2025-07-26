@@ -7,6 +7,7 @@ import { Search, MapPin, Calendar, Star, Filter } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { LeaseRequestModal } from '@/pages/LeaseRequests';
 
 interface Property {
@@ -26,6 +27,7 @@ interface Property {
 
 export const Properties = () => {
   const { toast } = useToast();
+  const { userProfile } = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,7 +73,9 @@ export const Properties = () => {
                          (property.ownerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (property.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = selectedType === 'All' || property.type === selectedType;
-    return matchesSearch && matchesType;
+    // Don't show landowner's own properties to them
+    const notOwnProperty = userProfile?.role !== 'landowner' || property.ownerId !== userProfile.uid;
+    return matchesSearch && matchesType && notOwnProperty;
   });
 
   if (loading) {
@@ -179,14 +183,32 @@ export const Properties = () => {
               </div>
 
               <div className="flex gap-2">
-                <LeaseRequestModal
-                  propertyId={property.id}
-                  propertyTitle={property.title}
-                  ownerId={property.ownerId}
-                  ownerName={property.ownerName}
-                  propertyLocation={property.location}
-                  propertyPrice={property.price}
-                />
+                {userProfile?.role === 'buyer' ? (
+                  <LeaseRequestModal
+                    propertyId={property.id}
+                    propertyTitle={property.title}
+                    ownerId={property.ownerId}
+                    ownerName={property.ownerName}
+                    propertyLocation={property.location}
+                    propertyPrice={property.price}
+                    onRequestSent={() => {
+                      // Optional: Could trigger a refresh or show a success message
+                      console.log('Lease request sent successfully');
+                    }}
+                  />
+                ) : userProfile?.role === 'landowner' ? (
+                  <Button variant="outline" disabled className="flex-1">
+                    Your Property
+                  </Button>
+                ) : userProfile?.role === 'vendor' ? (
+                  <Button variant="outline" disabled className="flex-1">
+                    Vendors cannot lease properties
+                  </Button>
+                ) : (
+                  <Button variant="outline" disabled className="flex-1">
+                    Login to request lease
+                  </Button>
+                )}
                 <Button variant="outline" size="icon">
                   <Calendar className="h-4 w-4" />
                 </Button>

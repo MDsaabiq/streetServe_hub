@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FileText, Calendar, MapPin, Building } from 'lucide-react';
-import { collection, addDoc, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { FileText, Calendar, MapPin, Building, RefreshCw } from 'lucide-react';
+import { collection, addDoc, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -37,9 +37,10 @@ interface LeaseRequestModalProps {
   ownerName: string;
   propertyLocation: string;
   propertyPrice: number;
+  onRequestSent?: () => void;
 }
 
-const LeaseRequestModal = ({ propertyId, propertyTitle, ownerId, ownerName, propertyLocation, propertyPrice }: LeaseRequestModalProps) => {
+const LeaseRequestModal = ({ propertyId, propertyTitle, ownerId, ownerName, propertyLocation, propertyPrice, onRequestSent }: LeaseRequestModalProps) => {
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -56,7 +57,7 @@ const LeaseRequestModal = ({ propertyId, propertyTitle, ownerId, ownerName, prop
     
     setLoading(true);
     try {
-      await addDoc(collection(db, 'leaseRequests'), {
+      const requestData = {
         propertyId,
         propertyTitle,
         propertyLocation,
@@ -71,7 +72,9 @@ const LeaseRequestModal = ({ propertyId, propertyTitle, ownerId, ownerName, prop
         message: formData.message,
         status: 'pending',
         createdAt: new Date()
-      });
+      };
+
+      const docRef = await addDoc(collection(db, 'leaseRequests'), requestData);
 
       toast({
         title: "Request sent!",
@@ -80,6 +83,11 @@ const LeaseRequestModal = ({ propertyId, propertyTitle, ownerId, ownerName, prop
 
       setOpen(false);
       setFormData({ phone: '', businessType: '', message: '' });
+
+      // Trigger refresh in parent component
+      if (onRequestSent) {
+        onRequestSent();
+      }
     } catch (error) {
       console.error('Error sending lease request:', error);
       toast({
@@ -150,21 +158,71 @@ export const LeaseRequests = () => {
   const { toast } = useToast();
   const [requests, setRequests] = useState<LeaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleRequestAction = async (requestId: string, action: 'approved' | 'rejected') => {
+    setActionLoading(requestId);
+    try {
+      await updateDoc(doc(db, 'leaseRequests', requestId), {
+        status: action,
+        updatedAt: new Date()
+      });
+
+      // Update local state
+      setRequests(prev => prev.map(req =>
+        req.id === requestId ? { ...req, status: action } : req
+      ));
+
+      toast({
+        title: `Request ${action}`,
+        description: `The lease request has been ${action}.`,
+      });
+    } catch (error) {
+      console.error('Error updating request:', error);
+      toast({
+        title: "Error",
+        description: `Failed to ${action.slice(0, -1)} the request.`,
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   useEffect(() => {
     const fetchRequests = async () => {
-      if (!userProfile?.uid) return;
+      if (!userProfile?.uid || !userProfile?.role) {
+        console.log('User profile not ready:', userProfile);
+        setLoading(false);
+        return;
+      }
 
       try {
-        const q = query(
-          collection(db, 'leaseRequests'),
-          where('requesterId', '==', userProfile.uid)
-        );
+        let q;
+        if (userProfile.role === 'landowner') {
+          // For landowners: fetch requests for their properties
+          q = query(
+            collection(db, 'leaseRequests'),
+            where('ownerId', '==', userProfile.uid)
+          );
+        } else {
+          // For buyers: fetch requests they've sent
+          q = query(
+            collection(db, 'leaseRequests'),
+            where('requesterId', '==', userProfile.uid)
+          );
+        }
+
         const querySnapshot = await getDocs(q);
         const fetchedRequests: LeaseRequest[] = [];
-        
+
+        console.log(`Fetching ${userProfile.role} requests for user ${userProfile.uid}`);
+        console.log(`Query returned ${querySnapshot.size} documents`);
+
         querySnapshot.forEach((doc) => {
           const data = doc.data();
+          console.log('Document data:', data);
           fetchedRequests.push({
             id: doc.id,
             ...data,
@@ -172,12 +230,13 @@ export const LeaseRequests = () => {
           } as LeaseRequest);
         });
 
+        console.log('Final requests array:', fetchedRequests);
         setRequests(fetchedRequests.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
       } catch (error) {
         console.error('Error fetching lease requests:', error);
         toast({
           title: "Error",
-          description: "Failed to fetch your lease requests.",
+          description: "Failed to fetch lease requests.",
           variant: "destructive",
         });
       } finally {
@@ -186,9 +245,9 @@ export const LeaseRequests = () => {
     };
 
     fetchRequests();
-  }, [userProfile?.uid, toast]);
+  }, [userProfile?.uid, userProfile?.role, toast, refreshTrigger]);
 
-  if (loading) {
+  if (loading || !userProfile) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-96">
@@ -200,23 +259,54 @@ export const LeaseRequests = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">My Lease Requests</h1>
-        <p className="text-muted-foreground">
-          Track your property lease requests
-        </p>
+      <div className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">
+            {userProfile?.role === 'landowner' ? 'Incoming Lease Requests' : 'My Lease Requests'}
+          </h1>
+          <p className="text-muted-foreground">
+            {userProfile?.role === 'landowner'
+              ? 'Manage lease requests for your properties'
+              : 'Track your property lease requests'
+            }
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => setRefreshTrigger(prev => prev + 1)}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {requests.length === 0 ? (
-        <Card className="border-0 bg-gradient-card shadow-card">
-          <CardContent className="p-12 text-center">
-            <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No Requests Yet</h3>
-            <p className="text-muted-foreground">
-              Your lease requests will appear here
-            </p>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card className="border-0 bg-gradient-card shadow-card">
+            <CardContent className="p-12 text-center">
+              <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No Requests Yet</h3>
+              <p className="text-muted-foreground">
+                {userProfile?.role === 'landowner'
+                  ? 'No lease requests have been received for your properties yet'
+                  : 'Your lease requests will appear here'
+                }
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Debug info */}
+          <Card className="border border-yellow-200 bg-yellow-50">
+            <CardContent className="p-4">
+              <h4 className="font-semibold mb-2">Debug Info:</h4>
+              <p><strong>User ID:</strong> {userProfile?.uid}</p>
+              <p><strong>User Role:</strong> {userProfile?.role}</p>
+              <p><strong>User Email:</strong> {userProfile?.email}</p>
+              <p><strong>Query Type:</strong> {userProfile?.role === 'landowner' ? 'ownerId' : 'requesterId'}</p>
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         <div className="space-y-6">
           {requests.map((request) => (
@@ -251,12 +341,43 @@ export const LeaseRequests = () => {
                     <span className="font-medium">Monthly Rent:</span> ₹{request.propertyPrice.toLocaleString()}
                   </div>
                   <div>
-                    <span className="font-medium">Owner:</span> {request.ownerName}
+                    <span className="font-medium">
+                      {userProfile?.role === 'landowner' ? 'Requester:' : 'Owner:'}
+                    </span> {userProfile?.role === 'landowner' ? request.requesterName : request.ownerName}
                   </div>
+                  {userProfile?.role === 'landowner' && (
+                    <div>
+                      <span className="font-medium">Contact:</span> {request.requesterEmail}
+                      {request.requesterPhone && ` • ${request.requesterPhone}`}
+                    </div>
+                  )}
                   <div>
                     <span className="font-medium">Message:</span>
                     <p className="text-muted-foreground mt-1">{request.message}</p>
                   </div>
+
+                  {userProfile?.role === 'landowner' && request.status === 'pending' && (
+                    <div className="flex gap-2 pt-4">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleRequestAction(request.id, 'approved')}
+                        disabled={actionLoading === request.id}
+                        className="flex-1"
+                      >
+                        {actionLoading === request.id ? 'Processing...' : 'Approve'}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleRequestAction(request.id, 'rejected')}
+                        disabled={actionLoading === request.id}
+                        className="flex-1"
+                      >
+                        {actionLoading === request.id ? 'Processing...' : 'Reject'}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

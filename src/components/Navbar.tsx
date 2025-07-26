@@ -32,6 +32,161 @@ const Navbar = () => {
     }
   };
 
+  // Role-based navigation items
+  const getNavigationItems = () => {
+    if (!currentUser || !userProfile) {
+      return (
+        <>
+          <Link to="/marketplace" className="text-sm font-medium hover:underline">
+            Marketplace
+          </Link>
+          <Link to="/properties" className="text-sm font-medium hover:underline">
+            Properties
+          </Link>
+          <Link to="/login" className="text-sm font-medium hover:underline">
+            Login
+          </Link>
+          <Link to="/signup" className="text-sm font-medium hover:underline">
+            Sign Up
+          </Link>
+        </>
+      );
+    }
+
+    switch (userProfile.role) {
+      case 'buyer':
+        return (
+          <>
+            <Link to="/marketplace" className="text-sm font-medium hover:underline">
+              Marketplace
+            </Link>
+            <Link to="/properties" className="text-sm font-medium hover:underline">
+              Properties
+            </Link>
+            <Link to="/orders" className="text-sm font-medium hover:underline">
+              My Orders
+            </Link>
+            <Link to="/lease-requests" className="text-sm font-medium hover:underline">
+              Lease Requests
+            </Link>
+          </>
+        );
+      case 'vendor':
+        return (
+          <>
+            <Link to="/marketplace" className="text-sm font-medium hover:underline">
+              Marketplace
+            </Link>
+            <Link to="/vendor/products" className="text-sm font-medium hover:underline">
+              My Products
+            </Link>
+            <Link to="/vendor/add-product" className="text-sm font-medium hover:underline">
+              Add Product
+            </Link>
+            <Link to="/vendor/orders" className="text-sm font-medium hover:underline">
+              Orders
+            </Link>
+          </>
+        );
+      case 'landowner':
+        return (
+          <>
+            <Link to="/properties" className="text-sm font-medium hover:underline">
+              Browse Properties
+            </Link>
+            <Link to="/landowner/properties" className="text-sm font-medium hover:underline">
+              My Properties
+            </Link>
+            <Link to="/landowner/add-property" className="text-sm font-medium hover:underline">
+              Add Property
+            </Link>
+            <Link to="/landowner/analytics" className="text-sm font-medium hover:underline">
+              Analytics
+            </Link>
+            <Link to="/lease-requests" className="text-sm font-medium hover:underline">
+              Lease Requests
+            </Link>
+          </>
+        );
+      default:
+        return (
+          <>
+            <Link to="/marketplace" className="text-sm font-medium hover:underline">
+              Marketplace
+            </Link>
+            <Link to="/properties" className="text-sm font-medium hover:underline">
+              Properties
+            </Link>
+          </>
+        );
+    }
+  };
+
+  // Role-based dropdown menu items
+  const getDropdownItems = () => {
+    if (!currentUser || !userProfile) return null;
+
+    switch (userProfile.role) {
+      case 'buyer':
+        return (
+          <>
+            <DropdownMenuItem asChild>
+              <Link to="/dashboard">Dashboard</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/orders">My Orders</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/lease-requests">Lease Requests</Link>
+            </DropdownMenuItem>
+          </>
+        );
+      case 'vendor':
+        return (
+          <>
+            <DropdownMenuItem asChild>
+              <Link to="/dashboard">Dashboard</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/vendor/products">My Products</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/vendor/add-product">Add Product</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/vendor/orders">Manage Orders</Link>
+            </DropdownMenuItem>
+          </>
+        );
+      case 'landowner':
+        return (
+          <>
+            <DropdownMenuItem asChild>
+              <Link to="/dashboard">Dashboard</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/landowner/properties">My Properties</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/landowner/add-property">Add Property</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/landowner/analytics">Analytics</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/lease-requests">Lease Requests</Link>
+            </DropdownMenuItem>
+          </>
+        );
+      default:
+        return (
+          <DropdownMenuItem asChild>
+            <Link to="/dashboard">Dashboard</Link>
+          </DropdownMenuItem>
+        );
+    }
+  };
+
   return (
     <nav className="bg-background border-b">
       <div className="flex h-16 items-center px-4">
@@ -39,16 +194,11 @@ const Navbar = () => {
           StreetServe
         </Link>
         <div className="flex items-center space-x-4 ml-auto">
-          <Link to="/marketplace" className="text-sm font-medium hover:underline">
-            Marketplace
-          </Link>
-          <Link to="/properties" className="text-sm font-medium hover:underline">
-            Properties
-          </Link>
-          
+          {getNavigationItems()}
+
           {currentUser && (
             <>
-              <Cart />
+              {userProfile?.role === 'buyer' && <Cart />}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -59,21 +209,11 @@ const Navbar = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuLabel>
+                    My Account ({userProfile?.role || 'User'})
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link to="/dashboard">Dashboard</Link>
-                  </DropdownMenuItem>
-                  {currentUser.role === 'vendor' && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/vendor/add-product">Add Product</Link>
-                    </DropdownMenuItem>
-                  )}
-                  {currentUser.role === 'landowner' && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/landowner/add-property">Add Property</Link>
-                    </DropdownMenuItem>
-                  )}
+                  {getDropdownItems()}
                   <DropdownMenuItem asChild>
                     <Link to="/profile">Profile</Link>
                   </DropdownMenuItem>

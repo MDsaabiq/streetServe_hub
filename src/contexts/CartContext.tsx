@@ -6,24 +6,25 @@ import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 
 interface CartItem {
-  productId: string;
+  id: string;
   title: string;
   price: number;
   image: string;
   quantity: number;
   vendorId: string;
   vendorName: string;
+  category: string;
+  description: string;
 }
 
 interface CartContextType {
-  items: CartItem[];
+  cartItems: CartItem[];
   addToCart: (product: any) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   getTotalPrice: () => number;
   getTotalItems: () => number;
-  checkout: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -37,29 +38,31 @@ export const useCart = () => {
 };
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const { userProfile } = useAuth();
   const { toast } = useToast();
 
   const addToCart = (product: any) => {
-    setItems(prevItems => {
-      const existingItem = prevItems.find(item => item.productId === product.id);
-      
+    setCartItems(prevItems => {
+      const existingItem = prevItems.find(item => item.id === product.id);
+
       if (existingItem) {
         return prevItems.map(item =>
-          item.productId === product.id
+          item.id === product.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       } else {
         return [...prevItems, {
-          productId: product.id,
+          id: product.id,
           title: product.title,
           price: product.price,
           image: product.image,
           quantity: 1,
           vendorId: product.vendorId,
-          vendorName: product.vendorName
+          vendorName: product.vendorName,
+          category: product.category,
+          description: product.description
         }];
       }
     });
@@ -71,7 +74,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const removeFromCart = (productId: string) => {
-    setItems(prevItems => prevItems.filter(item => item.productId !== productId));
+    setCartItems(prevItems => prevItems.filter(item => item.id !== productId));
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
@@ -80,9 +83,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     
-    setItems(prevItems =>
+    setCartItems(prevItems =>
       prevItems.map(item =>
-        item.productId === productId
+        item.id === productId
           ? { ...item, quantity }
           : item
       )
@@ -90,77 +93,25 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const clearCart = () => {
-    setItems([]);
+    setCartItems([]);
   };
 
   const getTotalPrice = () => {
-    return items.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
   const getTotalItems = () => {
-    return items.reduce((total, item) => total + item.quantity, 0);
-  };
-
-  const checkout = async () => {
-    if (!userProfile || items.length === 0) return;
-
-    try {
-      // Create orders for each vendor
-      const vendorOrders = items.reduce((acc, item) => {
-        if (!acc[item.vendorId]) {
-          acc[item.vendorId] = [];
-        }
-        acc[item.vendorId].push(item);
-        return acc;
-      }, {} as Record<string, CartItem[]>);
-
-      // Create separate orders for each vendor
-      for (const vendorId in vendorOrders) {
-        const vendorItems = vendorOrders[vendorId];
-        const totalAmount = vendorItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-        for (const item of vendorItems) {
-          await addDoc(collection(db, 'orders'), {
-            productId: item.productId,
-            productTitle: item.title,
-            quantity: item.quantity,
-            price: item.price,
-            totalAmount: item.price * item.quantity,
-            buyerId: userProfile.uid,
-            buyerName: userProfile.displayName || 'Unknown User',
-            buyerEmail: userProfile.email,
-            vendorId: item.vendorId,
-            vendorName: item.vendorName,
-            status: 'pending',
-            createdAt: new Date()
-          });
-        }
-      }
-
-      clearCart();
-      toast({
-        title: "Order placed successfully!",
-        description: "Your orders have been sent to the vendors.",
-      });
-    } catch (error) {
-      console.error('Error placing order:', error);
-      toast({
-        title: "Error",
-        description: "Failed to place order.",
-        variant: "destructive",
-      });
-    }
+    return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
   const value = {
-    items,
+    cartItems,
     addToCart,
     removeFromCart,
     updateQuantity,
     clearCart,
     getTotalPrice,
-    getTotalItems,
-    checkout
+    getTotalItems
   };
 
   return (

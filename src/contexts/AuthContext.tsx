@@ -40,7 +40,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const profileData = userDoc.data() as Omit<UserProfile, 'uid'>;
             const profile: UserProfile = {
               uid: user.uid,
-              ...profileData
+              ...profileData,
+              createdAt: profileData.createdAt?.toDate ? profileData.createdAt.toDate() : new Date(),
+              updatedAt: profileData.updatedAt?.toDate ? profileData.updatedAt.toDate() : new Date(),
             };
             setUserProfile(profile);
             setCurrentUser({

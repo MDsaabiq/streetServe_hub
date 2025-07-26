@@ -29,7 +29,6 @@ export const Marketplace = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [cart, setCart] = useState<{[key: string]: number}>({});
 
   const categories = ['All', 'Ingredients', 'Packaging', 'Utensils', 'Equipment', 'Spices', 'Other'];
 
@@ -78,30 +77,7 @@ export const Marketplace = () => {
     addToCart(product);
   };
 
-  const addToCart = (productId: string) => {
-    setCart(prev => ({
-      ...prev,
-      [productId]: (prev[productId] || 0) + 1
-    }));
-    toast({
-      title: "Added to cart",
-      description: "Product added to your cart successfully.",
-    });
-  };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => {
-      const newCart = { ...prev };
-      if (newCart[productId] > 1) {
-        newCart[productId]--;
-      } else {
-        delete newCart[productId];
-      }
-      return newCart;
-    });
-  };
-
-  const getCartQuantity = (productId: string) => cart[productId] || 0;
 
   if (loading) {
     return (
