@@ -24,8 +24,12 @@ export default async function handler(req, res) {
 
     const { amount, currency = 'INR' } = req.body;
 
+    if (!amount) {
+      return res.status(400).json({ error: 'Amount is required' });
+    }
+
     const options = {
-      amount: amount,
+      amount: parseInt(amount),
       currency,
       receipt: `receipt_${Date.now()}`,
       payment_capture: 1
