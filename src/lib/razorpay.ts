@@ -64,9 +64,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
 
 export const createRazorpayOrder = async (amount: number) => {
   try {
-    const url = import.meta.env.DEV 
-      ? 'http://localhost:3001/api/create-razorpay-order'
-      : '/api/create-razorpay-order';
+    const url = 'http://localhost:3001/api/create-razorpay-order';
       
     const response = await fetch(url, {
       method: 'POST',
@@ -92,9 +90,7 @@ export const createRazorpayOrder = async (amount: number) => {
 
 export const verifyPayment = async (paymentData: any) => {
   try {
-    const url = import.meta.env.DEV 
-      ? 'http://localhost:3001/api/verify-payment'
-      : '/api/verify-payment';
+    const url = 'http://localhost:3001/api/verify-payment';
       
     const response = await fetch(url, {
       method: 'POST',
