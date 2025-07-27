@@ -43,10 +43,10 @@ declare global {
 
 export const createRazorpayOrder = async (amount: number) => {
   try {
-    const url = 'http://localhost:3001/api/create-razorpay-order';
+    // Use Vercel API endpoint
+    const url = '/api/create-razorpay-order';
       
     console.log('Creating Razorpay order with amount:', amount);
-    console.log('Fetching URL:', url);
     
     const response = await fetch(url, {
       method: 'POST',
@@ -57,13 +57,8 @@ export const createRazorpayOrder = async (amount: number) => {
         amount: amount * 100,
         currency: 'INR',
       }),
-    }).catch(fetchError => {
-      console.error('Fetch failed:', fetchError);
-      throw new Error('Network error: ' + fetchError.message);
     });
 
-    console.log('Response received:', response.status);
-    
     const responseText = await response.text();
     console.log('Raw response text:', responseText);
 
