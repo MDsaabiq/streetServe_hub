@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Package, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, Package, Edit, Trash2 } from 'lucide-react';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -176,13 +176,10 @@ export const VendorProducts = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    <Eye className="mr-2 h-4 w-4" />
-                    View
-                  </Button>
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" className="flex-1" asChild>
                     <Link to={`/vendor/edit-product/${product.id}`}>
-                      <Edit className="h-4 w-4" />
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
                     </Link>
                   </Button>
                   <AlertDialog>

@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
-  DropdownMenuContent,
+  DropdownMenuContent,   
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -14,6 +14,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from '@/hooks/use-toast';
 import { Cart } from '@/components/Cart';
 import { Menu, X } from 'lucide-react';
+import logoImage from '@/assets/logo.png';
+
 
 const Navbar = () => {
   const { currentUser, logout, userProfile } = useAuth();
@@ -102,7 +104,7 @@ const Navbar = () => {
         ];
       case 'landowner':
         return [
-          { to: "/properties", label: "Browse Properties" },
+          // { to: "/properties", label: "Browse Properties" },
           { to: "/landowner/properties", label: "My Properties" },
           { to: "/landowner/add-property", label: "Add Property" },
           { to: "/landowner/analytics", label: "Analytics" },
@@ -187,8 +189,15 @@ const Navbar = () => {
     <nav className="navbar-container bg-gradient-to-r from-red-500 via-orange-400  to-red-500 border-b relative w-full shadow-md">
       <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto navbar-tablet-layout">
         {/* Logo */}
-        <Link to="/" className="navbar-logo font-extrabold text-2xl sm:text-3xl flex-shrink-0 z-10 touch-manipulation text-white drop-shadow-lg tracking-wide">
-          StreetServe
+        <Link to="/" className="navbar-logo flex items-center flex-shrink-0 z-10 touch-manipulation">
+          <img
+            src={logoImage}
+            alt="StreetServe Hub"
+            className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover mr-2 border-2 border-white/20 shadow-lg"
+          />
+          <span className="font-extrabold text-xl sm:text-2xl text-white drop-shadow-lg tracking-wide hidden sm:inline">
+            StreetServe
+          </span>
         </Link>
 
         {/* Desktop Navigation - Hidden on mobile */}
@@ -272,7 +281,7 @@ const Navbar = () => {
         >
           <div className="px-4 sm:px-6 py-6 space-y-2 min-h-0">
             {/* Navigation Links */}
-            {navigationItems.map((item, index) => (
+            {navigationItems.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}

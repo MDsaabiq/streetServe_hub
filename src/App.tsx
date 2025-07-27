@@ -23,6 +23,7 @@ import { LeaseRequests } from '@/pages/LeaseRequests';
 import { Orders } from '@/pages/Orders';
 import { Profile } from '@/pages/Profile';
 import { Checkout } from '@/pages/Checkout';
+import CartPage from '@/pages/CartPage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser, loading } = useAuth();
@@ -64,6 +65,7 @@ function App() {
                   <Route path="/landowner/properties" element={<ProtectedRoute><LandownerProperties /></ProtectedRoute>} />
                   <Route path="/landowner/edit-property/:id" element={<ProtectedRoute><LandownerEditProperty /></ProtectedRoute>} />
                   <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+                  <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
                   <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
                   <Route path="/lease-requests" element={<ProtectedRoute><LeaseRequests /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
