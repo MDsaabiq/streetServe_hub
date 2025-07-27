@@ -95,7 +95,7 @@ const Navbar = () => {
         ];
       case 'vendor':
         return [
-          { to: "/marketplace", label: "Marketplace" },
+  
           { to: "/vendor/products", label: "My Products" },
           { to: "/vendor/add-product", label: "Add Product" },
           { to: "/vendor/orders", label: "Orders" }
@@ -184,10 +184,10 @@ const Navbar = () => {
   const navigationItems = getNavigationItems();
 
   return (
-    <nav className="navbar-container bg-background border-b relative w-full">
+    <nav className="navbar-container bg-gradient-to-r from-red-500 via-orange-400  to-red-500 border-b relative w-full shadow-md">
       <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto navbar-tablet-layout">
         {/* Logo */}
-        <Link to="/" className="navbar-logo font-bold text-xl sm:text-2xl flex-shrink-0 z-10 touch-manipulation">
+        <Link to="/" className="navbar-logo font-extrabold text-2xl sm:text-3xl flex-shrink-0 z-10 touch-manipulation text-white drop-shadow-lg tracking-wide">
           StreetServe
         </Link>
 
@@ -198,13 +198,12 @@ const Navbar = () => {
               <Link
                 key={item.to}
                 to={item.to}
-                className="text-sm font-medium hover:text-primary transition-colors whitespace-nowrap"
+                className="text-base font-semibold hover:text-black text-white transition-colors whitespace-nowrap drop-shadow"
               >
                 {item.label}
               </Link>
             ))}
           </div>
-
           {currentUser && (
             <div className="flex items-center space-x-4 ml-6">
               {userProfile?.role === 'buyer' && <Cart />}

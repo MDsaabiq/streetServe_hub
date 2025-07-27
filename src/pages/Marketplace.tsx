@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, ShoppingCart, Filter, Star, Plus, Minus } from 'lucide-react';
+import { Search, ShoppingCart, Star } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -109,10 +109,7 @@ export const Marketplace = () => {
               className="pl-10 h-11"
             />
           </div>
-          <Button variant="outline" className="sm:w-auto">
-            <Filter className="mr-2 h-4 w-4" />
-            Filters
-          </Button>
+          {/* Removed Filter button */}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -164,7 +161,7 @@ export const Marketplace = () => {
             <CardContent className="pt-0">
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <p className="text-2xl font-bold text-primary">₹{product.price}</p>
+                  <p className="text-2xl font-bold text-green-600">₹{product.price}</p>
                   <p className="text-sm text-muted-foreground">{product.quantity}</p>
                 </div>
               </div>
