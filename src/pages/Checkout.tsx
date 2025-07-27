@@ -1,29 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/hooks/use-toast';
-import { collection, addDoc, doc, updateDoc, getDoc, runTransaction } from 'firebase/firestore';
+import { Badge } from '@/components/ui/badge';
+import { RazorpayPayment } from '@/components/RazorpayPayment';
+import { createRazorpayOrder, verifyPayment, updateOrderPaymentStatus } from '@/lib/razorpay';
+import { 
+  ArrowLeft, 
+  ArrowRight, 
+  Package, 
+  CreditCard, 
+  Truck, 
+  Check,
+  MapPin,
+  Phone,
+  Mail,
+  User,
+  ShoppingCart
+} from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { 
-  ShoppingCart, 
-  MapPin, 
-  CreditCard, 
-  Check, 
-  ArrowLeft, 
-  ArrowRight,
-  Package,
-  User,
-  Phone,
-  Mail
-} from 'lucide-react';
+  collection, 
+  doc, 
+  runTransaction, 
+  getDocs, 
+  query, 
+  where,
+  updateDoc,
+  getDoc
+} from 'firebase/firestore';
 
 interface CheckoutStep {
   id: number;
@@ -47,6 +59,8 @@ export const Checkout = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
   
   const [shippingInfo, setShippingInfo] = useState({
     fullName: userProfile?.displayName || '',
@@ -54,6 +68,7 @@ export const Checkout = () => {
     email: userProfile?.email || '',
     address: '',
     city: '',
+    state: '',
     pincode: '',
     notes: ''
   });
@@ -102,6 +117,25 @@ export const Checkout = () => {
     
     setLoading(true);
     try {
+      // Create Razorpay order first if payment method is not COD
+      let razorpayOrder = null;
+      if (paymentInfo.method !== 'cod') {
+        try {
+          razorpayOrder = await createRazorpayOrder(getTotalPrice());
+          setRazorpayOrderId(razorpayOrder.id);
+          console.log('Razorpay order created:', razorpayOrder);
+        } catch (error) {
+          console.error('Error creating Razorpay order:', error);
+          toast({
+            title: "Payment Error",
+            description: "Failed to initialize payment. Please try again.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       // Use transaction to ensure inventory is updated atomically
       const orderIds = await runTransaction(db, async (transaction) => {
         // Check inventory and update quantities
@@ -136,15 +170,10 @@ export const Checkout = () => {
           return groups;
         }, {} as Record<string, typeof cartItems>);
 
-        console.log('Creating orders for vendor groups:', vendorGroups);
-
         // Create separate orders for each vendor
         const createdOrderIds: string[] = [];
 
         for (const [vendorId, vendorItems] of Object.entries(vendorGroups)) {
-          const vendorTotal = vendorItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-          // For each item, create a separate order (to match VendorOrders expectation)
           for (const item of vendorItems) {
             const orderRef = doc(collection(db, 'orders'));
             const orderData = {
@@ -163,14 +192,14 @@ export const Checkout = () => {
               shippingInfo,
               paymentInfo: {
                 method: paymentInfo.method,
-                status: paymentInfo.method === 'cod' ? 'pending' : 'paid'
+                status: paymentInfo.method === 'cod' ? 'pending' : 'pending',
+                razorpayOrderId: razorpayOrder?.id || null
               },
               status: 'pending',
               createdAt: new Date(),
               updatedAt: new Date()
             };
 
-            console.log('Creating order for vendor:', vendorId, orderData);
             transaction.set(orderRef, orderData);
             createdOrderIds.push(orderRef.id);
           }
@@ -179,17 +208,20 @@ export const Checkout = () => {
         return createdOrderIds;
       });
 
-      setOrderId(orderIds[0]); // Set the first order ID for display
+      setOrderId(orderIds[0]);
       
-      // Clear cart
-      clearCart();
-      
-      toast({
-        title: "Orders Placed Successfully!",
-        description: `${orderIds.length} order(s) have been placed and sent to vendors for confirmation.`,
-      });
-      
-      setCurrentStep(4);
+      // If COD, complete the order
+      if (paymentInfo.method === 'cod') {
+        clearCart();
+        toast({
+          title: "Orders Placed Successfully!",
+          description: `${orderIds.length} order(s) have been placed and sent to vendors for confirmation.`,
+        });
+        setCurrentStep(4);
+      } else {
+        // For online payment, proceed to payment step
+        setCurrentStep(4); // Show payment step
+      }
     } catch (error: any) {
       console.error('Error processing order:', error);
       toast({
@@ -200,6 +232,51 @@ export const Checkout = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePaymentSuccess = async (paymentData: any) => {
+    setPaymentProcessing(true);
+    try {
+      // Verify payment
+      const verification = await verifyPayment(paymentData);
+      
+      if (verification.status === 'success') {
+        // Update all orders with payment info
+        if (orderId) {
+          await updateOrderPaymentStatus(orderId, {
+            ...paymentData,
+            method: paymentInfo.method
+          });
+        }
+
+        clearCart();
+        toast({
+          title: "Payment Successful!",
+          description: "Your order has been placed and payment confirmed.",
+        });
+        setCurrentStep(5); // Success step
+      } else {
+        throw new Error('Payment verification failed');
+      }
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      toast({
+        title: "Payment Verification Failed",
+        description: "Payment was processed but verification failed. Please contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setPaymentProcessing(false);
+    }
+  };
+
+  const handlePaymentFailure = (error: any) => {
+    console.error('Payment failed:', error);
+    toast({
+      title: "Payment Failed",
+      description: error.message || "Payment was cancelled or failed. Please try again.",
+      variant: "destructive",
+    });
   };
 
   const renderStepIndicator = () => (
@@ -369,17 +446,151 @@ export const Checkout = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Checkout</h1>
-        <p className="text-muted-foreground">Complete your purchase</p>
-      </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Checkout</h1>
+          <div className="flex items-center space-x-4">
+            {[1, 2, 3, 4].map((step) => (
+              <div key={step} className="flex items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step <= currentStep ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {step}
+                </div>
+                {step < 4 && <div className={`w-12 h-0.5 ${step < currentStep ? 'bg-primary' : 'bg-muted'}`} />}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between mt-2 text-sm text-muted-foreground">
+            <span>Cart Review</span>
+            <span>Shipping</span>
+            <span>Payment</span>
+            <span>Complete</span>
+          </div>
+        </div>
 
-      {renderStepIndicator()}
+        {/* Step 1: Cart Review */}
+        {currentStep === 1 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Package className="mr-2 h-5 w-5" />
+                Review Your Order
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {cartItems.map((item) => (
+                  <div key={item.id} className="flex items-center space-x-4 p-4 border rounded-lg">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      className="w-16 h-16 object-cover rounded"
+                    />
+                    <div className="flex-1">
+                      <h3 className="font-medium">{item.title}</h3>
+                      <p className="text-sm text-muted-foreground">by {item.vendorName}</p>
+                      <p className="text-sm">Quantity: {item.quantity}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">₹{(item.price * item.quantity).toLocaleString()}</p>
+                      <p className="text-sm text-muted-foreground">₹{item.price} each</p>
+                    </div>
+                  </div>
+                ))}
+                
+                <Separator />
+                
+                <div className="flex justify-between items-center text-lg font-semibold">
+                  <span>Total: ₹{getTotalPrice().toLocaleString()}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-      <div className="space-y-6">
-        {currentStep === 1 && renderCartReview()}
-        {currentStep === 2 && renderShippingInfo()}
+        {/* Step 2: Shipping Information */}
+        {currentStep === 2 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Truck className="mr-2 h-5 w-5" />
+                Shipping Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    value={shippingInfo.fullName}
+                    onChange={(e) => setShippingInfo({...shippingInfo, fullName: e.target.value})}
+                    placeholder="Enter your full name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={shippingInfo.phone}
+                    onChange={(e) => setShippingInfo({...shippingInfo, phone: e.target.value})}
+                    placeholder="Enter your phone number"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={shippingInfo.email}
+                    onChange={(e) => setShippingInfo({...shippingInfo, email: e.target.value})}
+                    placeholder="Enter your email"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input
+                    id="address"
+                    value={shippingInfo.address}
+                    onChange={(e) => setShippingInfo({...shippingInfo, address: e.target.value})}
+                    placeholder="Enter your full address"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    value={shippingInfo.city}
+                    onChange={(e) => setShippingInfo({...shippingInfo, city: e.target.value})}
+                    placeholder="Enter your city"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="state">State</Label>
+                  <Input
+                    id="state"
+                    value={shippingInfo.state}
+                    onChange={(e) => setShippingInfo({...shippingInfo, state: e.target.value})}
+                    placeholder="Enter your state"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="pincode">Pincode</Label>
+                  <Input
+                    id="pincode"
+                    value={shippingInfo.pincode}
+                    onChange={(e) => setShippingInfo({...shippingInfo, pincode: e.target.value})}
+                    placeholder="Enter your pincode"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 3: Payment Method */}
         {currentStep === 3 && (
           <Card>
             <CardHeader>
@@ -389,65 +600,49 @@ export const Checkout = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex space-x-4">
-                  <Button
-                    variant={paymentInfo.method === 'cod' ? 'default' : 'outline'}
-                    onClick={() => setPaymentInfo({...paymentInfo, method: 'cod'})}
-                  >
-                    Cash on Delivery
-                  </Button>
-                  <Button
-                    variant={paymentInfo.method === 'card' ? 'default' : 'outline'}
-                    onClick={() => setPaymentInfo({...paymentInfo, method: 'card'})}
-                  >
-                    Credit/Debit Card
-                  </Button>
-                  <Button
-                    variant={paymentInfo.method === 'upi' ? 'default' : 'outline'}
-                    onClick={() => setPaymentInfo({...paymentInfo, method: 'upi'})}
-                  >
-                    UPI
-                  </Button>
+              <RadioGroup
+                value={paymentInfo.method}
+                onValueChange={(value) => setPaymentInfo({...paymentInfo, method: value})}
+              >
+                <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                  <RadioGroupItem value="cod" id="cod" />
+                  <Label htmlFor="cod" className="flex-1 cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Cash on Delivery</p>
+                        <p className="text-sm text-muted-foreground">Pay when you receive your order</p>
+                      </div>
+                      <Badge variant="secondary">COD</Badge>
+                    </div>
+                  </Label>
                 </div>
                 
-                {paymentInfo.method === 'card' && (
-                  <div className="space-y-4 p-4 border rounded-lg">
-                    <Input
-                      placeholder="Card Number"
-                      value={paymentInfo.cardNumber}
-                      onChange={(e) => setPaymentInfo({...paymentInfo, cardNumber: e.target.value})}
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input
-                        placeholder="MM/YY"
-                        value={paymentInfo.expiryDate}
-                        onChange={(e) => setPaymentInfo({...paymentInfo, expiryDate: e.target.value})}
-                      />
-                      <Input
-                        placeholder="CVV"
-                        value={paymentInfo.cvv}
-                        onChange={(e) => setPaymentInfo({...paymentInfo, cvv: e.target.value})}
-                      />
+                <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                  <RadioGroupItem value="online" id="online" />
+                  <Label htmlFor="online" className="flex-1 cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Online Payment</p>
+                        <p className="text-sm text-muted-foreground">Pay securely with card, UPI, or net banking</p>
+                      </div>
+                      <Badge variant="default">Secure</Badge>
                     </div>
-                  </div>
-                )}
-                
-                {paymentInfo.method === 'upi' && (
-                  <div className="p-4 border rounded-lg">
-                    <Input
-                      placeholder="UPI ID (e.g., user@paytm)"
-                      value={paymentInfo.upiId}
-                      onChange={(e) => setPaymentInfo({...paymentInfo, upiId: e.target.value})}
-                    />
-                  </div>
-                )}
+                  </Label>
+                </div>
+              </RadioGroup>
+              
+              <div className="mt-6 p-4 bg-muted rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Total Amount:</span>
+                  <span className="text-2xl font-bold">₹{getTotalPrice().toLocaleString()}</span>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
-        
-        {currentStep === 4 && (
+
+        {/* Step 4: Payment Processing (COD) */}
+        {currentStep === 4 && paymentInfo.method === 'cod' && (
           <Card>
             <CardContent className="p-12 text-center">
               <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -469,8 +664,72 @@ export const Checkout = () => {
           </Card>
         )}
 
+        {/* Step 4: Payment Processing (Online) */}
+        {currentStep === 4 && paymentInfo.method === 'online' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <CreditCard className="mr-2 h-5 w-5" />
+                Complete Payment
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-medium">Total Amount:</span>
+                    <span className="text-2xl font-bold">₹{getTotalPrice()}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Secure payment powered by Razorpay
+                  </p>
+                </div>
+                
+                {razorpayOrderId && (
+                  <RazorpayPayment
+                    amount={getTotalPrice()}
+                    orderId={razorpayOrderId}
+                    userInfo={{
+                      name: shippingInfo.fullName,
+                      email: shippingInfo.email,
+                      phone: shippingInfo.phone
+                    }}
+                    onSuccess={handlePaymentSuccess}
+                    onFailure={handlePaymentFailure}
+                    loading={paymentProcessing}
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 5: Payment Success */}
+        {currentStep === 5 && (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <Check className="h-8 w-8 text-green-600" />
+              </div>
+              <h3 className="text-2xl font-semibold mb-2">Payment Successful!</h3>
+              <p className="text-muted-foreground mb-4">
+                Your order #{orderId?.slice(-8)} has been placed and payment confirmed.
+              </p>
+              <div className="flex gap-4 justify-center">
+                <Button onClick={() => navigate('/orders')}>
+                  View Orders
+                </Button>
+                <Button variant="outline" onClick={() => navigate('/marketplace')}>
+                  Continue Shopping
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Navigation Buttons */}
         {currentStep < 4 && (
-          <div className="flex justify-between">
+          <div className="flex justify-between mt-8">
             <Button
               variant="outline"
               onClick={handlePrevious}
