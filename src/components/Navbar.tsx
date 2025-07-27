@@ -92,6 +92,7 @@ const Navbar = () => {
         return [
           { to: "/marketplace", label: "Marketplace" },
           { to: "/properties", label: "Properties" },
+          { to: "/favorites", label: "Favorites" },
           { to: "/orders", label: "My Orders" },
           { to: "/lease-requests", label: "Lease Requests" }
         ];

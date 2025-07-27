@@ -24,6 +24,9 @@ import { Orders } from '@/pages/Orders';
 import { Profile } from '@/pages/Profile';
 import { Checkout } from '@/pages/Checkout';
 import CartPage from '@/pages/CartPage';
+import { ProductReview } from '@/pages/ProductReview';
+import { ProductDetails } from '@/pages/ProductDetails';
+import { Favorites } from '@/pages/Favorites';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser, loading } = useAuth();
@@ -69,6 +72,9 @@ function App() {
                   <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
                   <Route path="/lease-requests" element={<ProtectedRoute><LeaseRequests /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                  <Route path="/review/:productId/:orderId" element={<ProtectedRoute><ProductReview /></ProtectedRoute>} />
+                  <Route path="/product/:productId" element={<ProtectedRoute><ProductDetails /></ProtectedRoute>} />
+                  <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
                 </Routes>
               </main>
             </div>

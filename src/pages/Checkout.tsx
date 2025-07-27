@@ -138,10 +138,20 @@ export const Checkout = () => {
 
       // Use transaction to ensure inventory is updated atomically
       const orderIds = await runTransaction(db, async (transaction) => {
-        // Check inventory and update quantities
+        // STEP 1: Read all product documents first
+        const productReads = [];
         for (const item of cartItems) {
           const productRef = doc(db, 'products', item.id);
-          const productDoc = await transaction.get(productRef);
+          productReads.push(transaction.get(productRef));
+        }
+        
+        // Wait for all reads to complete
+        const productDocs = await Promise.all(productReads);
+        
+        // STEP 2: Validate inventory
+        for (let i = 0; i < cartItems.length; i++) {
+          const item = cartItems[i];
+          const productDoc = productDocs[i];
 
           if (!productDoc.exists()) {
             throw new Error(`Product ${item.title} no longer exists`);
@@ -153,56 +163,55 @@ export const Checkout = () => {
           if (currentQuantity < item.quantity) {
             throw new Error(`Insufficient stock for ${item.title}. Available: ${currentQuantity}`);
           }
+        }
 
-          // Update product quantity
+        // STEP 3: Now perform all writes
+        const createdOrderIds: string[] = [];
+
+        // Update product quantities
+        for (let i = 0; i < cartItems.length; i++) {
+          const item = cartItems[i];
+          const productDoc = productDocs[i];
+          const productRef = doc(db, 'products', item.id);
+          
+          const productData = productDoc.data();
+          const currentQuantity = parseInt(productData.quantity) || 0;
+
           transaction.update(productRef, {
             quantity: (currentQuantity - item.quantity).toString(),
             updatedAt: new Date()
           });
         }
 
-        // Group items by vendor
-        const vendorGroups = cartItems.reduce((groups, item) => {
-          if (!groups[item.vendorId]) {
-            groups[item.vendorId] = [];
-          }
-          groups[item.vendorId].push(item);
-          return groups;
-        }, {} as Record<string, typeof cartItems>);
+        // Create orders
+        for (const item of cartItems) {
+          const orderRef = doc(collection(db, 'orders'));
+          const orderData = {
+            buyerId: userProfile.uid,
+            buyerName: userProfile.displayName || 'Unknown',
+            buyerEmail: userProfile.email,
+            buyerPhone: shippingInfo.phone,
+            buyerAddress: `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.state} - ${shippingInfo.pincode}`,
+            productId: item.id,
+            productTitle: item.title,
+            quantity: item.quantity,
+            price: item.price,
+            totalAmount: item.price * item.quantity,
+            vendorId: item.vendorId,
+            vendorName: item.vendorName,
+            shippingInfo,
+            paymentInfo: {
+              method: paymentInfo.method,
+              status: paymentInfo.method === 'cod' ? 'pending' : 'pending',
+              razorpayOrderId: razorpayOrder?.id || null
+            },
+            status: 'pending',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
 
-        // Create separate orders for each vendor
-        const createdOrderIds: string[] = [];
-
-        for (const [vendorId, vendorItems] of Object.entries(vendorGroups)) {
-          for (const item of vendorItems) {
-            const orderRef = doc(collection(db, 'orders'));
-            const orderData = {
-              buyerId: userProfile.uid,
-              buyerName: userProfile.displayName || 'Unknown',
-              buyerEmail: userProfile.email,
-              buyerPhone: shippingInfo.phone,
-              buyerAddress: `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.state} - ${shippingInfo.pincode}`,
-              productId: item.id,
-              productTitle: item.title,
-              quantity: item.quantity,
-              price: item.price,
-              totalAmount: item.price * item.quantity,
-              vendorId: item.vendorId,
-              vendorName: item.vendorName,
-              shippingInfo,
-              paymentInfo: {
-                method: paymentInfo.method,
-                status: paymentInfo.method === 'cod' ? 'pending' : 'pending',
-                razorpayOrderId: razorpayOrder?.id || null
-              },
-              status: 'pending',
-              createdAt: new Date(),
-              updatedAt: new Date()
-            };
-
-            transaction.set(orderRef, orderData);
-            createdOrderIds.push(orderRef.id);
-          }
+          transaction.set(orderRef, orderData);
+          createdOrderIds.push(orderRef.id);
         }
 
         return createdOrderIds;

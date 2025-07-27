@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, Calendar, User, X, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Package, Calendar, User, X, AlertTriangle, RefreshCw, Star, Truck, CheckCircle, XCircle, Clock, Bell } from 'lucide-react';
 import { collection, query, where, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +47,7 @@ interface Order {
 export const Orders = () => {
   const { userProfile } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
@@ -257,6 +259,18 @@ export const Orders = () => {
       });
     } finally {
       setCancellingOrder(null);
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending': return <Clock className="h-4 w-4" />;
+      case 'confirmed': return <CheckCircle className="h-4 w-4" />;
+      case 'processing': return <Package className="h-4 w-4" />;
+      case 'shipped': return <Truck className="h-4 w-4" />;
+      case 'delivered': return <CheckCircle className="h-4 w-4" />;
+      case 'cancelled': return <XCircle className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
     }
   };
 
@@ -478,6 +492,30 @@ export const Orders = () => {
                         </AlertDialogContent>
                       </AlertDialog>
                     </div>
+                  </div>
+                )}
+
+                {(order.status === 'delivered' || order.status === 'cancelled') && (
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center gap-2 mb-3">
+                      {getStatusIcon(order.status)}
+                      <span className={`text-sm font-medium ${
+                        order.status === 'delivered' ? 'text-green-700' : 'text-red-700'
+                      }`}>
+                        {order.status === 'delivered' ? 'Order Completed Successfully' : 'Order Cancelled'}
+                      </span>
+                    </div>
+                    {order.status === 'delivered' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/review/${order.productId || order.items?.[0]?.productId}/${order.id}`)}
+                        className="w-full sm:w-auto"
+                      >
+                        <Star className="h-4 w-4 mr-2" />
+                        Add Review
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>
