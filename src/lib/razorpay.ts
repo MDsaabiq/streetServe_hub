@@ -1,6 +1,10 @@
-// Add this function to load Razorpay script
 export const loadRazorpayScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
+    if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
+      resolve(true);
+      return;
+    }
+    
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.onload = () => resolve(true);
@@ -9,7 +13,6 @@ export const loadRazorpayScript = (): Promise<boolean> => {
   });
 };
 
-// Add RazorpayOptions interface
 export interface RazorpayOptions {
   key: string;
   amount: number;
@@ -32,21 +35,15 @@ export interface RazorpayOptions {
   };
 }
 
-// Declare Razorpay on window
 declare global {
   interface Window {
     Razorpay: any;
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-  (import.meta.env.DEV ? 'http://localhost:3001' : '');
-
 export const createRazorpayOrder = async (amount: number) => {
   try {
-    const url = import.meta.env.DEV 
-      ? 'http://localhost:3001/api/create-razorpay-order'
-      : '/api/create-razorpay-order';
+    const url = '/api/create-razorpay-order';
       
     console.log('Creating Razorpay order with amount:', amount);
     
@@ -61,7 +58,6 @@ export const createRazorpayOrder = async (amount: number) => {
       }),
     });
 
-    // Check if response is JSON
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
@@ -86,9 +82,7 @@ export const createRazorpayOrder = async (amount: number) => {
 
 export const verifyPayment = async (paymentData: any) => {
   try {
-    const url = import.meta.env.DEV 
-      ? 'http://localhost:3001/api/verify-payment'
-      : '/api/verify-payment';
+    const url = '/api/verify-payment';
       
     const response = await fetch(url, {
       method: 'POST',
