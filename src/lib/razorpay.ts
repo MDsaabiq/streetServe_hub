@@ -43,10 +43,10 @@ declare global {
 
 export const createRazorpayOrder = async (amount: number) => {
   try {
-    // Use your Express server instead of serverless functions
-    const url = 'https://your-express-server-url.com/api/create-razorpay-order';
+    const url = 'http://localhost:3001/api/create-razorpay-order';
       
     console.log('Creating Razorpay order with amount:', amount);
+    console.log('Fetching URL:', url);
     
     const response = await fetch(url, {
       method: 'POST',
@@ -57,8 +57,13 @@ export const createRazorpayOrder = async (amount: number) => {
         amount: amount * 100,
         currency: 'INR',
       }),
+    }).catch(fetchError => {
+      console.error('Fetch failed:', fetchError);
+      throw new Error('Network error: ' + fetchError.message);
     });
 
+    console.log('Response received:', response.status);
+    
     const responseText = await response.text();
     console.log('Raw response text:', responseText);
 

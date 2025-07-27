@@ -1,5 +1,0 @@
-{
-  "functions": {
-    "api/*.js": "nodejs20.x"
-  }
-}

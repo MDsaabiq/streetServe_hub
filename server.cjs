@@ -9,8 +9,7 @@ const port = 3001;
 app.use(cors({
   origin: ['http://localhost:8080', 'http://localhost:3000', 'http://localhost:5173'],
   credentials: true
-}));
-app.use(express.json());
+}));app.use(express.json());
 
 const razorpay = new Razorpay({
   key_id: 'rzp_test_t4LUM04KXw6wHc',
