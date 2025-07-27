@@ -58,14 +58,18 @@ export const createRazorpayOrder = async (amount: number) => {
       }),
     });
 
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('Non-JSON response:', text);
-      throw new Error('Server returned invalid response');
-    }
+    // Get response text first
+    const responseText = await response.text();
+    console.log('Raw response:', responseText);
 
-    const data = await response.json();
+    // Try to parse as JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse response as JSON:', responseText);
+      throw new Error('Server returned invalid response: ' + responseText.substring(0, 100));
+    }
     
     if (!response.ok) {
       console.error('Razorpay order creation failed:', data);
