@@ -1,12 +1,15 @@
-import { db } from './firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+// Add this function to load Razorpay script
+export const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
-}
-
+// Add RazorpayOptions interface
 export interface RazorpayOptions {
   key: string;
   amount: number;
@@ -14,6 +17,7 @@ export interface RazorpayOptions {
   name: string;
   description: string;
   order_id: string;
+  config?: any;
   handler: (response: any) => void;
   prefill: {
     name: string;
@@ -26,62 +30,46 @@ export interface RazorpayOptions {
   modal: {
     ondismiss: () => void;
   };
-  config?: {
-    display: {
-      blocks: {
-        banks: {
-          name: string;
-          instruments: Array<{
-            method: string;
-          }>;
-        };
-      };
-      sequence: string[];
-      preferences: {
-        show_default_blocks: boolean;
-      };
-    };
-  };
 }
 
-export const loadRazorpayScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if (window.Razorpay) {
-      resolve(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
+// Declare Razorpay on window
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
   (import.meta.env.DEV ? 'http://localhost:3001' : '');
 
 export const createRazorpayOrder = async (amount: number) => {
   try {
-    const url = 'http://localhost:3001/api/create-razorpay-order';
+    const url = import.meta.env.DEV 
+      ? 'http://localhost:3001/api/create-razorpay-order'
+      : '/api/create-razorpay-order';
       
+    console.log('Creating Razorpay order with amount:', amount);
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: amount * 100, // Convert to paise
+        amount: amount * 100,
         currency: 'INR',
       }),
     });
 
+    const data = await response.json();
+    
     if (!response.ok) {
-      throw new Error('Failed to create Razorpay order');
+      console.error('Razorpay order creation failed:', data);
+      throw new Error(data.error || 'Failed to create Razorpay order');
     }
 
-    return await response.json();
+    console.log('Razorpay order created successfully:', data);
+    return data;
   } catch (error) {
     console.error('Error creating Razorpay order:', error);
     throw error;
@@ -90,7 +78,9 @@ export const createRazorpayOrder = async (amount: number) => {
 
 export const verifyPayment = async (paymentData: any) => {
   try {
-    const url = 'http://localhost:3001/api/verify-payment';
+    const url = import.meta.env.DEV 
+      ? 'http://localhost:3001/api/verify-payment'
+      : '/api/verify-payment';
       
     const response = await fetch(url, {
       method: 'POST',
@@ -113,6 +103,9 @@ export const verifyPayment = async (paymentData: any) => {
 
 export const updateOrderPaymentStatus = async (orderId: string, paymentData: any) => {
   try {
+    const { updateDoc, doc } = await import('firebase/firestore');
+    const { db } = await import('./firebase');
+    
     await updateDoc(doc(db, 'orders', orderId), {
       paymentInfo: {
         ...paymentData,
@@ -126,7 +119,3 @@ export const updateOrderPaymentStatus = async (orderId: string, paymentData: any
     throw error;
   }
 };
-
-
-
-
