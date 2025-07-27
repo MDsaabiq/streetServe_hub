@@ -43,7 +43,8 @@ declare global {
 
 export const createRazorpayOrder = async (amount: number) => {
   try {
-    const url = '/api/create-razorpay-order';
+    // Use your Express server instead of serverless functions
+    const url = 'https://your-express-server-url.com/api/create-razorpay-order';
       
     console.log('Creating Razorpay order with amount:', amount);
     
@@ -58,28 +59,26 @@ export const createRazorpayOrder = async (amount: number) => {
       }),
     });
 
-    // Get response text first
     const responseText = await response.text();
-    console.log('Raw response:', responseText);
+    console.log('Raw response text:', responseText);
 
-    // Try to parse as JSON
     let data;
     try {
       data = JSON.parse(responseText);
     } catch (parseError) {
       console.error('Failed to parse response as JSON:', responseText);
-      throw new Error('Server returned invalid response: ' + responseText.substring(0, 100));
+      throw new Error('Server error: ' + responseText.substring(0, 200));
     }
     
     if (!response.ok) {
-      console.error('Razorpay order creation failed:', data);
-      throw new Error(data.error || 'Failed to create Razorpay order');
+      console.error('Order creation failed:', data);
+      throw new Error(data.error || 'Failed to create order');
     }
 
-    console.log('Razorpay order created successfully:', data);
+    console.log('Order created successfully:', data);
     return data;
   } catch (error) {
-    console.error('Error creating Razorpay order:', error);
+    console.error('Error creating order:', error);
     throw error;
   }
 };

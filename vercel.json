@@ -1,9 +1,5 @@
 {
-
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
+  "functions": {
+    "api/*.js": "nodejs20.x"
+  }
 }
