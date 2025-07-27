@@ -59,15 +59,24 @@ export const loadRazorpayScript = (): Promise<boolean> => {
   });
 };
 
-export const createRazorpayOrder = async (amount: number, currency = 'INR') => {
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+  (import.meta.env.DEV ? 'http://localhost:3001' : '');
+
+export const createRazorpayOrder = async (amount: number) => {
   try {
-    // Use local development server only
-    const response = await fetch('http://localhost:3001/api/create-razorpay-order', {
+    const url = import.meta.env.DEV 
+      ? 'http://localhost:3001/api/create-razorpay-order'
+      : '/api/create-razorpay-order';
+      
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ amount: amount * 100, currency }),
+      body: JSON.stringify({
+        amount: amount * 100, // Convert to paise
+        currency: 'INR',
+      }),
     });
 
     if (!response.ok) {
@@ -83,8 +92,11 @@ export const createRazorpayOrder = async (amount: number, currency = 'INR') => {
 
 export const verifyPayment = async (paymentData: any) => {
   try {
-    // Use local development server only
-    const response = await fetch('http://localhost:3001/api/verify-payment', {
+    const url = import.meta.env.DEV 
+      ? 'http://localhost:3001/api/verify-payment'
+      : '/api/verify-payment';
+      
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -118,6 +130,7 @@ export const updateOrderPaymentStatus = async (orderId: string, paymentData: any
     throw error;
   }
 };
+
 
 
 

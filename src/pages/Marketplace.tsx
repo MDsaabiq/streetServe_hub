@@ -3,66 +3,142 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, ShoppingCart, Star } from 'lucide-react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { Search, ShoppingCart, Star, Heart, Eye } from 'lucide-react';
+import { collection, getDocs, query, orderBy, where, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useCart } from '@/contexts/CartContext';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Product {
   id: string;
   title: string;
+  description: string;
   price: number;
   image: string;
-  quantity: string;
   category: string;
-  description: string;
   vendorId: string;
   vendorName: string;
-  createdAt: Date;
+  quantity: string;
+  averageRating?: number;
+  totalReviews?: number;
 }
 
 export const Marketplace = () => {
   const { toast } = useToast();
   const { addToCart } = useCart();
+  const { userProfile } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const navigate = useNavigate();
 
   const categories = ['All', 'Ingredients', 'Packaging', 'Utensils', 'Equipment', 'Spices', 'Other'];
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchProductsWithRatings = async () => {
+      setLoading(true);
       try {
-        const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
-        const querySnapshot = await getDocs(q);
-        const fetchedProducts: Product[] = [];
+        const productsQuery = query(collection(db, 'products'));
+        const productsSnapshot = await getDocs(productsQuery);
         
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          fetchedProducts.push({
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate() || new Date(),
-          } as Product);
-        });
-
-        setProducts(fetchedProducts);
+        const productsWithRatings = await Promise.all(
+          productsSnapshot.docs.map(async (doc) => {
+            const productData = { id: doc.id, ...doc.data() } as Product;
+            
+            // Fetch reviews for this product
+            const reviewsQuery = query(
+              collection(db, 'reviews'),
+              where('productId', '==', doc.id)
+            );
+            const reviewsSnapshot = await getDocs(reviewsQuery);
+            
+            if (reviewsSnapshot.size > 0) {
+              const totalRating = reviewsSnapshot.docs.reduce(
+                (sum, reviewDoc) => sum + (reviewDoc.data().rating || 0),
+                0
+              );
+              productData.averageRating = totalRating / reviewsSnapshot.size;
+              productData.totalReviews = reviewsSnapshot.size;
+            } else {
+              productData.averageRating = 0;
+              productData.totalReviews = 0;
+            }
+            
+            return productData;
+          })
+        );
+        
+        setProducts(productsWithRatings);
       } catch (error) {
         console.error('Error fetching products:', error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch products.",
-          variant: "destructive",
-        });
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
-  }, [toast]);
+    fetchProductsWithRatings();
+  }, []);
+
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      if (!userProfile?.uid) return;
+      
+      try {
+        const favQuery = query(
+          collection(db, 'favorites'),
+          where('userId', '==', userProfile.uid)
+        );
+        const favSnapshot = await getDocs(favQuery);
+        const favSet = new Set<string>();
+        favSnapshot.forEach((doc) => {
+          favSet.add(doc.data().productId);
+        });
+        setFavorites(favSet);
+      } catch (error) {
+        console.error('Error fetching favorites:', error);
+      }
+    };
+
+    fetchFavorites();
+  }, [userProfile?.uid]);
+
+  const handleToggleFavorite = async (productId: string) => {
+    if (!userProfile?.uid) return;
+
+    try {
+      if (favorites.has(productId)) {
+        // Remove from favorites
+        const favQuery = query(
+          collection(db, 'favorites'),
+          where('userId', '==', userProfile.uid),
+          where('productId', '==', productId)
+        );
+        const favSnapshot = await getDocs(favQuery);
+        favSnapshot.forEach(async (doc) => {
+          await deleteDoc(doc.ref);
+        });
+        setFavorites(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(productId);
+          return newSet;
+        });
+      } else {
+        // Add to favorites
+        await addDoc(collection(db, 'favorites'), {
+          userId: userProfile.uid,
+          productId,
+          createdAt: new Date(),
+        });
+        setFavorites(prev => new Set(prev).add(productId));
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = (product.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -75,6 +151,7 @@ export const Marketplace = () => {
 
   const handleAddToCart = (product: Product) => {
     addToCart(product);
+    navigate('/cart');
   };
 
 
@@ -140,12 +217,6 @@ export const Marketplace = () => {
                   {product.category}
                 </Badge>
               </div>
-              <div className="absolute top-4 right-4">
-                <div className="flex items-center bg-background/90 rounded-full px-2 py-1 text-sm">
-                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 mr-1" />
-                  4.8
-                </div>
-              </div>
             </div>
             
             <CardHeader className="pb-3">
@@ -159,23 +230,65 @@ export const Marketplace = () => {
             </CardHeader>
 
             <CardContent className="pt-0">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-center mb-2">
                 <div>
                   <p className="text-2xl font-bold text-green-600">₹{product.price}</p>
-                  <p className="text-sm text-muted-foreground">{product.quantity}</p>
+                  <p className="text-sm text-muted-foreground">Items Left: {product.quantity}</p>
                 </div>
               </div>
+              
+              {/* Rating Display */}
+              {product.totalReviews && product.totalReviews > 0 ? (
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`h-4 w-4 ${
+                          star <= Math.round(product.averageRating || 0)
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {product.averageRating?.toFixed(1)} ({product.totalReviews} reviews)
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-sm text-muted-foreground">No reviews yet</span>
+                </div>
+              )}
 
               <div className="flex gap-2 items-center">
-                  <Button 
-                    variant="marketplace" 
-                    className="flex-1"
-                    onClick={() => handleAddToCart(product)}
-                  >
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    Add to Cart
-                  </Button>
-                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate(`/product/${product.id}`)}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </Button>
+                <Button 
+                  variant="marketplace" 
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => handleAddToCart(product)}
+                >
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Add to Cart
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleToggleFavorite(product.id)}
+                  className={favorites.has(product.id) ? 'text-red-500 border-red-500' : ''}
+                >
+                  <Heart className={`h-4 w-4 ${favorites.has(product.id) ? 'fill-red-500' : ''}`} />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
